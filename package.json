@@ -1,0 +1,42 @@
+{
+  "name": "react-applets",
+  "version": "0.1.0",
+  "description": "Lightweight windowing system for React: draggable, resizable, stackable frames on a canvas",
+  "keywords": ["react", "window", "windowing", "draggable", "resizable", "frame", "desktop", "mdi"],
+  "license": "MIT",
+  "author": "Bill DeStein",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/billdestein/react-applets.git"
+  },
+  "homepage": "https://github.com/billdestein/react-applets#readme",
+  "bugs": "https://github.com/billdestein/react-applets/issues",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": ["dist", "src"],
+  "sideEffects": false,
+  "scripts": {
+    "build": "rm -rf dist && tsc",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "typescript": "^5.4.5"
+  }
+}
