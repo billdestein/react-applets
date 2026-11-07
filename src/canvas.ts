@@ -47,6 +47,43 @@ export function nextZIndex(): number {
     return topZIndex
 }
 
+// Mouse events that land inside an iframe or webview never reach this document, so a frame
+// holding one could not be raised by clicking its body, and a drag would stall as the cursor
+// crossed one. To prevent both, every frame has an invisible catcher over its viewport. It is
+// shown on all frames except the frontmost, and on every frame during a drag or resize. Frames
+// register here and toggle their catcher through direct DOM manipulation, so restacking does
+// not re-render anything.
+export type FrameHandle = {
+    getZIndex: () => number
+    setCatcher: (visible: boolean, cursor?: string) => void
+}
+
+const frames = new Set<FrameHandle>()
+
+export function registerFrame(frame: FrameHandle): () => void {
+    frames.add(frame)
+    syncCatchers()
+    return () => {
+        frames.delete(frame)
+        syncCatchers()
+    }
+}
+
+// Shows the catcher on every frame except the frontmost.
+export function syncCatchers(): void {
+    let front: FrameHandle | undefined
+    for (const frame of frames) {
+        if (!front || frame.getZIndex() > front.getZIndex()) front = frame
+    }
+    for (const frame of frames) frame.setCatcher(frame !== front)
+}
+
+// Shows the catcher on every frame for the length of a drag or resize. The cursor is set on the
+// catchers as well, because each frame's own cursor would otherwise show through.
+export function coverAllFrames(cursor: string): void {
+    for (const frame of frames) frame.setCatcher(true, cursor)
+}
+
 export function addApplet(
     AppletComponent: ComponentType<AppletProps>,
     props: AddAppletProps = {},

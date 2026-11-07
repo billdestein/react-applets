@@ -81,7 +81,12 @@ is simplest) plus:
 - Drag a frame by its header. It stays reachable: it cannot go above the canvas top, and at
   least 30px stays on screen horizontally.
 - Resize from any edge or corner (the 5px border plus 5px inside it).
-- Clicking anywhere in a frame raises it to the top.
+- Clicking anywhere in a frame raises it to the top. This works even when the frame contains
+  an iframe or webview, because every frame except the frontmost has an invisible click catcher
+  over its body. As a result, the first click on a background frame only raises it; the click
+  does not reach the frame's contents.
+- Iframes don't interrupt dragging or resizing, because every frame body is covered while the
+  gesture is in progress.
 - Dragging and resizing update the DOM directly, with no React re-renders.
 
 ## License

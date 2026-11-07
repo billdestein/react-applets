@@ -1,6 +1,6 @@
-import { useRef, CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
+import { useLayoutEffect, useRef, CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { FrameProps } from './types.js'
-import { nextZIndex } from './canvas.js'
+import { coverAllFrames, nextZIndex, registerFrame, syncCatchers } from './canvas.js'
 
 const BORDER = 5 // five-pixel border around the header + viewport
 const HEADER_HEIGHT = 32
@@ -19,10 +19,21 @@ type Edges = { left: boolean; right: boolean; top: boolean; bottom: boolean }
 
 export function Frame(props: FrameProps) {
     const outerRef = useRef<HTMLDivElement>(null)
+    const catcherRef = useRef<HTMLDivElement>(null)
     // Current geometry. w/h are the VIEWPORT dimensions; x/y are canvas-relative.
     const geo = useRef({ x: props.x, y: props.y, w: props.width, h: props.height })
     // Freezes cursor updates during an active drag/resize.
     const draggingRef = useRef(false)
+
+    // The catcher is hidden until registerFrame decides whether this frame is the frontmost.
+    useLayoutEffect(() => registerFrame({
+        getZIndex: () => Number(outerRef.current!.style.zIndex),
+        setCatcher: (visible, cursor = '') => {
+            const catcher = catcherRef.current!
+            catcher.style.display = visible ? 'block' : 'none'
+            catcher.style.cursor = cursor
+        },
+    }), [])
 
     const outerWidth = (w: number) => w + 2 * BORDER
     const outerHeight = (h: number) => h + HEADER_HEIGHT + 2 * BORDER
@@ -77,6 +88,7 @@ export function Frame(props: FrameProps) {
     function startGesture(edges: Edges, startX: number, startY: number, cursor: string): void {
         draggingRef.current = true // Rule 3
         document.body.style.cursor = cursor // Rule 4: lock the cursor globally
+        coverAllFrames(cursor) // Keep iframes from swallowing the gesture's mouse events.
 
         const start = { ...geo.current }
         const isResize = edges.left || edges.right || edges.top || edges.bottom
@@ -127,6 +139,7 @@ export function Frame(props: FrameProps) {
             window.removeEventListener('mouseup', onUp)
             draggingRef.current = false // Rule 3
             document.body.style.cursor = '' // Rule 4 cleanup
+            syncCatchers()
         }
 
         window.addEventListener('mousemove', onMove)
@@ -137,6 +150,7 @@ export function Frame(props: FrameProps) {
     // It raises this frame to the top of the stack, then intercepts edge clicks for resizing.
     function onMouseDownCapture(ev: ReactMouseEvent): void {
         outerRef.current!.style.zIndex = String(nextZIndex())
+        syncCatchers()
 
         const edges = hitTest(ev.clientX, ev.clientY)
         const onEdge = edges.left || edges.right || edges.top || edges.bottom
@@ -197,6 +211,13 @@ export function Frame(props: FrameProps) {
         position: 'relative',
     }
 
+    const catcherStyle: CSSProperties = {
+        display: 'none',
+        position: 'absolute',
+        inset: 0,
+        zIndex: 2147483647,
+    }
+
     return (
         <div
             ref={outerRef}
@@ -217,7 +238,10 @@ export function Frame(props: FrameProps) {
                         {props.headerButtons}
                     </div>
                 </div>
-                <div style={viewportStyle}>{props.children}</div>
+                <div style={viewportStyle}>
+                    {props.children}
+                    <div ref={catcherRef} style={catcherStyle} />
+                </div>
             </div>
         </div>
     )

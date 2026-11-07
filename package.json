@@ -1,8 +1,17 @@
 {
   "name": "react-applets",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Lightweight windowing system for React: draggable, resizable, stackable frames on a canvas",
-  "keywords": ["react", "window", "windowing", "draggable", "resizable", "frame", "desktop", "mdi"],
+  "keywords": [
+    "react",
+    "window",
+    "windowing",
+    "draggable",
+    "resizable",
+    "frame",
+    "desktop",
+    "mdi"
+  ],
   "license": "MIT",
   "author": "Bill DeStein",
   "repository": {
@@ -21,7 +30,10 @@
     },
     "./package.json": "./package.json"
   },
-  "files": ["dist", "src"],
+  "files": [
+    "dist",
+    "src"
+  ],
   "sideEffects": false,
   "scripts": {
     "build": "rm -rf dist && tsc",
