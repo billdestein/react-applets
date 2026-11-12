@@ -1,4 +1,6 @@
-export { setCanvas, addApplet, removeApplet } from './canvas.js'
-export type { AddAppletProps } from './canvas.js'
+export { setCanvas, setTheme, addApplet, removeApplet } from './canvas.js'
+export type { AddAppletProps, CanvasOptions } from './canvas.js'
+export { darkTheme, lightTheme } from './theme.js'
+export type { Theme } from './theme.js'
 export { Frame } from './Frame.js'
 export type { AppletProps, FrameProps } from './types.js'

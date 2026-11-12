@@ -1,24 +1,20 @@
 import { useLayoutEffect, useRef, CSSProperties, MouseEvent as ReactMouseEvent } from 'react'
 import { FrameProps } from './types.js'
 import { coverAllFrames, nextZIndex, registerFrame, syncCatchers } from './canvas.js'
+import { cssVar, getGeometry } from './theme.js'
 
-const BORDER = 5 // five-pixel border around the header + viewport
-const HEADER_HEIGHT = 32
-// The resize grab zone: anywhere on the border (5px) plus five pixels inside it.
-const RESIZE_ZONE = BORDER + 5
+// The border width and header height come from the theme (see theme.ts) and are read at the
+// moment they are needed, so setTheme can change them while frames are open.
+// The resize grab zone: anywhere on the border plus five pixels inside it.
+const RESIZE_INSET = 5
 const MIN_W = 120
 const MIN_H = 80
-
-// Chrome theme colors. These must be distinct so the border is actually visible.
-const COLOR_BORDER = '#444444'
-const COLOR_HEADER = '#2d2d2d'
-const COLOR_HEADER_TEXT = '#dddddd'
-const COLOR_VIEWPORT = '#1e1e1e'
 
 type Edges = { left: boolean; right: boolean; top: boolean; bottom: boolean }
 
 export function Frame(props: FrameProps) {
     const outerRef = useRef<HTMLDivElement>(null)
+    const headerRef = useRef<HTMLDivElement>(null)
     const catcherRef = useRef<HTMLDivElement>(null)
     // Current geometry. w/h are the VIEWPORT dimensions; x/y are canvas-relative.
     const geo = useRef({ x: props.x, y: props.y, w: props.width, h: props.height })
@@ -33,10 +29,25 @@ export function Frame(props: FrameProps) {
             catcher.style.display = visible ? 'block' : 'none'
             catcher.style.cursor = cursor
         },
+        // data-active marks the frontmost frame, so hosts can style it with CSS.
+        setActive: active => {
+            const outer = outerRef.current!
+            if (active) outer.setAttribute('data-active', '')
+            else outer.removeAttribute('data-active')
+        },
+        relayout: () => {
+            const { borderWidth, headerHeight } = getGeometry()
+            outerRef.current!.style.padding = borderWidth + 'px'
+            headerRef.current!.style.height = headerHeight + 'px'
+            applyGeo()
+        },
     }), [])
 
-    const outerWidth = (w: number) => w + 2 * BORDER
-    const outerHeight = (h: number) => h + HEADER_HEIGHT + 2 * BORDER
+    const outerWidth = (w: number) => w + 2 * getGeometry().borderWidth
+    const outerHeight = (h: number) => {
+        const { borderWidth, headerHeight } = getGeometry()
+        return h + headerHeight + 2 * borderWidth
+    }
 
     function applyGeo(): void {
         const outer = outerRef.current
@@ -51,11 +62,12 @@ export function Frame(props: FrameProps) {
         const r = outerRef.current!.getBoundingClientRect()
         const lx = clientX - r.left
         const ly = clientY - r.top
+        const zone = getGeometry().borderWidth + RESIZE_INSET
         return {
-            left: lx <= RESIZE_ZONE,
-            right: lx >= r.width - RESIZE_ZONE,
-            top: ly <= RESIZE_ZONE,
-            bottom: ly >= r.height - RESIZE_ZONE,
+            left: lx <= zone,
+            right: lx >= r.width - zone,
+            top: ly <= zone,
+            bottom: ly >= r.height - zone,
         }
     }
 
@@ -81,7 +93,8 @@ export function Frame(props: FrameProps) {
         // Over the header (the grab bar) but not an edge -> move cursor.
         const r = outer.getBoundingClientRect()
         const ly = ev.clientY - r.top
-        outer.style.cursor = ly <= BORDER + HEADER_HEIGHT ? 'move' : 'default'
+        const { borderWidth, headerHeight } = getGeometry()
+        outer.style.cursor = ly <= borderWidth + headerHeight ? 'move' : 'default'
     }
 
     // Shared engine for dragging (no edges) and resizing (one or two edges).
@@ -127,7 +140,8 @@ export function Frame(props: FrameProps) {
                     // Left: right edge stays >= 30px from the left. Right: left edge <= cw-30.
                     nx = Math.max(30 - ow, Math.min(cw - 30, nx))
                     // Up: top stays >= 0. Down: bottom of header stays within the canvas.
-                    ny = Math.max(0, Math.min(ch - (BORDER + HEADER_HEIGHT), ny))
+                    const { borderWidth, headerHeight } = getGeometry()
+                    ny = Math.max(0, Math.min(ch - (borderWidth + headerHeight), ny))
                 }
                 geo.current = { ...geo.current, x: nx, y: ny }
             }
@@ -170,16 +184,20 @@ export function Frame(props: FrameProps) {
         startGesture(noEdge, ev.clientX, ev.clientY, 'move')
     }
 
+    // Geometry is rendered from geo rather than props, so a re-render after the user has moved
+    // or resized the frame, or after setTheme, does not snap it back to its initial geometry.
+    const { borderWidth, headerHeight } = getGeometry()
     const outerStyle: CSSProperties = {
+        background: cssVar('borderColor'),
+        ...props.style,
         position: 'absolute',
-        left: props.x,
-        top: props.y,
-        width: outerWidth(props.width),
-        height: outerHeight(props.height),
+        left: geo.current.x,
+        top: geo.current.y,
+        width: outerWidth(geo.current.w),
+        height: outerHeight(geo.current.h),
         zIndex: props.zIndex,
-        background: COLOR_BORDER,
         boxSizing: 'border-box',
-        padding: BORDER,
+        padding: borderWidth,
         overflow: 'hidden',
     }
 
@@ -191,22 +209,22 @@ export function Frame(props: FrameProps) {
     }
 
     const headerStyle: CSSProperties = {
-        height: HEADER_HEIGHT,
+        height: headerHeight,
         flex: '0 0 auto',
-        background: COLOR_HEADER,
-        color: COLOR_HEADER_TEXT,
+        background: cssVar('headerBackground'),
+        color: cssVar('headerColor'),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         padding: '0 8px',
-        fontSize: 13,
-        fontFamily: 'sans-serif',
+        fontSize: cssVar('fontSize'),
+        fontFamily: cssVar('fontFamily'),
         userSelect: 'none',
     }
 
     const viewportStyle: CSSProperties = {
         flex: '1 1 auto',
-        background: COLOR_VIEWPORT,
+        background: cssVar('viewportBackground'),
         overflow: 'hidden',
         position: 'relative',
     }
@@ -221,24 +239,26 @@ export function Frame(props: FrameProps) {
     return (
         <div
             ref={outerRef}
+            className={props.className ? `ra-frame ${props.className}` : 'ra-frame'}
             style={outerStyle}
             onMouseDownCapture={onMouseDownCapture}
             onMouseMove={onMouseMove}
         >
             <div style={innerStyle}>
-                <div style={headerStyle} onMouseDown={onHeaderMouseDown}>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div ref={headerRef} className="ra-header" style={headerStyle} onMouseDown={onHeaderMouseDown}>
+                    <span className="ra-title" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {props.title}
                     </span>
                     {/* Rule 7: clicking a header button must not start a header drag. */}
                     <div
+                        className="ra-header-buttons"
                         style={{ display: 'flex', alignItems: 'center', gap: 2 }}
                         onMouseDown={e => e.stopPropagation()}
                     >
                         {props.headerButtons}
                     </div>
                 </div>
-                <div style={viewportStyle}>
+                <div className="ra-viewport" style={viewportStyle}>
                     {props.children}
                     <div ref={catcherRef} style={catcherStyle} />
                 </div>

@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { CSSProperties, ReactNode } from 'react'
 
 // Passed by addApplet to an Applet component.
 export type AppletProps = {
@@ -25,4 +25,8 @@ export type FrameProps = {
     title: string
     headerButtons: ReactNode
     children: ReactNode
+    // Optional extra class and styles for the frame's outer div, for styling one applet
+    // differently. Position, size and stacking always come from the Frame itself.
+    className?: string
+    style?: CSSProperties
 }

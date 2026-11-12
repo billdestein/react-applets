@@ -1,6 +1,7 @@
 import { createElement, ComponentType } from 'react'
 import { createRoot, Root } from 'react-dom/client'
 import { AppletProps } from './types.js'
+import { applyTheme, cssVar, Theme } from './theme.js'
 
 // The canvas is a single position:relative div in the host app. Each frame is mounted into
 // its own plain unpositioned div (frameEl) appended to the canvas — invisible infrastructure
@@ -10,6 +11,7 @@ import { AppletProps } from './types.js'
 let canvasEl: HTMLElement | null = null
 let nextAppletId = 1
 let topZIndex = 0
+let currentTheme: Partial<Theme> = {}
 
 type AppletRecord = {
     appletId: number
@@ -34,10 +36,25 @@ export type AddAppletProps = {
     y?: number
 }
 
-export function setCanvas(id: string): void {
+export type CanvasOptions = {
+    theme?: Partial<Theme>
+}
+
+export function setCanvas(id: string, options: CanvasOptions = {}): void {
     const el = document.getElementById(id)
     if (!el) throw new Error(`setCanvas: no element found with id "${id}"`)
     canvasEl = el
+    if (options.theme) currentTheme = options.theme
+    applyTheme(canvasEl, currentTheme)
+}
+
+// Themes every frame on the canvas, including frames that are already open. Keys left out
+// fall back to the host's stylesheet (for colors and fonts) or to darkTheme. May be called
+// before setCanvas; the theme is then applied when the canvas is set.
+export function setTheme(theme: Partial<Theme>): void {
+    currentTheme = theme
+    applyTheme(canvasEl, theme)
+    for (const frame of frames) frame.relayout()
 }
 
 // Returns a fresh z-index that is greater than every frame currently on the canvas. The
@@ -56,6 +73,8 @@ export function nextZIndex(): number {
 export type FrameHandle = {
     getZIndex: () => number
     setCatcher: (visible: boolean, cursor?: string) => void
+    setActive: (active: boolean) => void
+    relayout: () => void
 }
 
 const frames = new Set<FrameHandle>()
@@ -75,7 +94,10 @@ export function syncCatchers(): void {
     for (const frame of frames) {
         if (!front || frame.getZIndex() > front.getZIndex()) front = frame
     }
-    for (const frame of frames) frame.setCatcher(frame !== front)
+    for (const frame of frames) {
+        frame.setCatcher(frame !== front)
+        frame.setActive(frame === front)
+    }
 }
 
 // Shows the catcher on every frame for the length of a drag or resize. The cursor is set on the
@@ -116,7 +138,8 @@ export function addApplet(
         clickCatcher.style.top = '0'
         clickCatcher.style.width = '100%'
         clickCatcher.style.height = '100%'
-        clickCatcher.style.background = 'rgba(128, 128, 128, 0.4)'
+        clickCatcher.className = 'ra-modal-overlay'
+        clickCatcher.style.background = cssVar('modalOverlay')
         clickCatcher.style.zIndex = String(catcherZ)
         // Do NOT set pointer-events:none — we want it to block, not pass through.
         canvasEl.appendChild(clickCatcher)
